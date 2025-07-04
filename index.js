@@ -6,43 +6,45 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-if (!process.env.ELEVENLABS_API_KEY) {
-  console.error("Error: ELEVENLABS_API_KEY environment variable is required");
-  process.exit(1);
-}
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID = "q8qwd1jY2jS3AWOBeq25";
+const MODEL_ID = "eleven_multilingual_v2";
 
-app.get("/test", (_req, res) => {
-  res.send("ElevenLabs Proxy OK");
+app.get("/", (req, res) => {
+  res.send("🟢 ElevenLabs Proxy aktif");
 });
 
 app.post("/speak", async (req, res) => {
-  const text = req.body.text || req.body.text;
-  if (!text) return res.status(400).send("Error: text is required");
+  const text = req.body.text || req.query.text;
+  if (!text) return res.status(400).send("Teks kosong");
+
+  const payload = {
+    text: text,
+    model_id: MODEL_ID,
+    voice_settings: {
+      stability: 0.5,
+      similarity_boost: 0.75
+    },
+    output_format: "mp3_44100_128"
+  };
 
   try {
-    const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID || ""}`, {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: "POST",
       headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        Accept: "audio/mpeg",
-        "Content-Type": "application/json"
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg"
       },
-      body: JSON.stringify({
-        text: text,
-        model_id: process.env.MODEL_ID || "eleven_multilingual_v2",
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
-        },
-        output_format: "mp3_44100_128"
-      })
+      body: JSON.stringify(payload)
     });
 
-    if (!resp.ok) {
-      const t = await resp.text();
-      return res.status(resp.status).send(`Error from ElevenLabs: ${t}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).send("Gagal: " + errText);
     }
-    const buffer = await resp.arrayBuffer();
+
+    const buffer = await response.arrayBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
     res.send(base64);
   } catch (err) {
@@ -50,7 +52,6 @@ app.post("/speak", async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
+app.listen(3000, () => {
+  console.log("Server jalan di http://localhost:3000");
 });
